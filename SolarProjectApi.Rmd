@@ -1,0 +1,112 @@
+---
+title: "Solar Resourse API"
+author: "Timur"
+date: "12/12/2021"
+output: html_document
+---
+
+# Introduction
+
+- Title: New York Solar Resouse Data Analysis
+- Description: The following project aims to extract the solar resource data for New York city in JSON format and convert it into a dataframe.
+
+# Determining the URL Endpoint and the parameters to query the API
+
+'''{r}
+my_api = "CezFTPSsUUqwXUGoE3uta2e9w3cqGGUbBtSZg5lm"
+
+url <- "https://developer.nrel.gov/docs/solar/solar-resource-v1/#json"
+
+parameters_list <- list(api_key = my_api, lat = 41, lon = -75)
+'''
+
+#Extracting Resources Data
+'''{r}
+
+library(httr)
+
+get_response <- GET(url, query = parameters_list)
+
+status <- status_code(get_response)
+status
+
+as_text <- content(response, "text")
+
+print(as_text)
+'''
+
+
+# Convert text into manipulable R object
+'''{r}
+json_lists <- jsonlite::fromJSON(as_text)
+str(json_lists)
+'''
+
+# Converting list into a dataframe
+'''{r}
+output_list <- json_lists$outputs
+
+avg_dni <- output_list$avg_dni$monthly
+
+avg_ghi <- output_list$avg_dhi$monthly
+
+avg_lat_tilt <- output_list$avg_lat_tilt$monthly
+
+dataframe_result <- tibble::tibble("month" = month.abb, "avg_dni" = avg_dni, "avg_ghi" = avg_ghi, "avg_lat_tilt" = avg_lat_tilt)
+
+dataframe_result
+'''
+
+#Combining everything together
+'''{r}
+library(httr)
+library(dplyr)
+
+nrel_api_json_get_df <- function(endpoint, queries = list()) {
+
+  url <- modify_url("https://developer.nrel.gov", path = endpoint)
+  
+  response <- GET(url, query = queries)
+  
+  if(http_error(response)){
+    print(status_code(response))
+    print(http_status(response))
+    stop("Something went wrong.", call. = FALSE)
+  }
+  if (http_type(response) != "application/json") {
+    stop("API did not return json", call. = FALSE)
+  }
+  
+  json_text <- content(response, "text")
+  table_lst <- jsonlite::fromJSON(json_text)
+  
+  dataframe <- tibble::tibble("month" = month.abb,"avg_dni" = as.numeric(table_lst$outputs$avg_dni$monthly), "avg_ghi" = as.numeric(table_lst$outputs$avg_ghi), "avg_lat_tilt" = as.numeric(table_lst$outputs$avg_lat_tilt))
+  
+  dataframe
+}
+
+solar_resource_df <- nrel_api_json_get_df("api/solar/solar_resource/v1.json", parameters_list)
+
+solar_resource_df
+'''
+
+'''{r}
+library(ggplot2)
+library(dplyr)
+
+ggplot(data = "solar_resource_df, aes(x = month, y = avg_dni, group = 1)) + geom_line() + geom_point() + theme_bw()
+
+solar_resource_df <- solar_resource_df %>% mutate(month = factor(month, levels = month.abb))
+ggplot(data = "solar_resource_df, aes(x = month, y = avg_dni, group = 1)) + geom_line() + geom_point() + theme_bw()
+'''
+
+
+
+
+
+
+
+
+
+
+
